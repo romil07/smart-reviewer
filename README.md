@@ -9,6 +9,7 @@ A single-page web application that searches for recent news articles, generates 
 | Backend | Java 17, Spring Boot 4.1.0 |
 | AI | Anthropic Java SDK (`claude-opus-4-8`) |
 | News API | GNews.io |
+| Scraping | Firecrawl |
 | Database | MongoDB |
 | Frontend | React 18 + Vite |
 
@@ -21,6 +22,7 @@ A single-page web application that searches for recent news articles, generates 
 - MongoDB running on `localhost:27017`
 - Node.js 18+ and npm
 - [GNews.io](https://gnews.io) API key (free tier: 100 req/day)
+- [Firecrawl](https://firecrawl.dev) API key (used to fetch full article content)
 - Anthropic API key
 
 ---
@@ -34,9 +36,17 @@ Set these before starting the backend:
 ```bash
 export ANTHROPIC_API_KEY=your_anthropic_api_key
 export GNEWS_API_KEY=your_gnews_api_key
+export FIRECRAWL_API_KEY=your_firecrawl_api_key
 ```
 
-Or edit `src/main/resources/application.properties` directly.
+Alternatively, create `src/main/resources/application-local.properties` (git-ignored) with:
+
+```properties
+gnews.api.key=your_gnews_api_key
+firecrawl.api.key=your_firecrawl_api_key
+```
+
+Then run the backend with `-Dspring.profiles.active=local`.
 
 ### 2. MongoDB
 
@@ -50,8 +60,9 @@ brew services start mongodb-community
 ### 3. Backend
 
 ```bash
-cd /Users/romiluk91/IdeaProjects/Aries
 mvn spring-boot:run
+# or, if using application-local.properties:
+mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
 The API starts on `http://localhost:8080`.
@@ -59,7 +70,7 @@ The API starts on `http://localhost:8080`.
 ### 4. Frontend
 
 ```bash
-cd /Users/romiluk91/IdeaProjects/Aries/frontend
+cd frontend
 npm install
 npm run dev
 ```
@@ -96,6 +107,7 @@ Open `http://localhost:5173` in your browser.
 1. User types a keyword in the search bar → frontend calls `GET /api/news/search`.
 2. Backend fetches up to 10 articles from GNews.io and returns them.
 3. User clicks **Analyse** on any article → frontend calls `POST /api/articles/analyze`.
-4. Backend sends title + content to Claude (`claude-opus-4-8`) in a **single API call** asking for both a summary and a sentiment label (`POSITIVE`, `NEUTRAL`, or `NEGATIVE`).
-5. Result is saved to MongoDB and added to the Analysed Articles table.
-6. Re-analysing an already-stored URL returns the cached result without a new Claude call.
+4. Backend uses Firecrawl to scrape the full article content from the URL (falls back to the GNews snippet if scraping fails).
+5. Full content is sent to Claude (`claude-opus-4-8`), which returns a summary and a sentiment label (`POSITIVE`, `NEUTRAL`, or `NEGATIVE`).
+6. Result is saved to MongoDB and added to the Analysed Articles table.
+7. Re-analysing an already-stored URL returns the cached result without a new Claude or Firecrawl call.
